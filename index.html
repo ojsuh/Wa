@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web apasaja v001</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/showdown/2.1.0/showdown.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            font-family: 'Inter', sans-serif; 
+            overflow-x: hidden;
+            background-color: #030712;
+            background-image: radial-gradient(at 47% 33%, hsl(190.00, 0%, 100%) 0, transparent 59%), radial-gradient(at 82% 65%, hsl(218.00, 39%, 20%) 0, transparent 55%);
+        }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #111827; }
+        ::-webkit-scrollbar-thumb { background: #374151; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #4b5563; }
+
+        #sidebar { transition: transform 0.3s ease-in-out; }
+        @media (max-width: 768px) {
+            #sidebar { transform: translateX(-100%); position: fixed; height: 100vh; z-index: 100; }
+            #sidebar.open { transform: translateX(0); }
+            #content-overlay { transition: opacity 0.3s ease-in-out; }
+        }
+        .sidebar-link.active { background-color: #0e7490; color: white; font-weight: 600; }
+        .feature-content { animation: fadeIn 0.4s ease-in-out; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(15px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .feature-card {
+            background: rgba(17, 24, 39, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 1rem;
+            padding: 1.5rem;
+        }
+        /* Game Styles */
+        .ttt-cell { aspect-ratio: 1/1; display: flex; justify-content: center; align-items: center; font-size: 3rem; font-weight: bold; background-color: #374151; border-radius: 0.5rem; cursor: pointer; transition: background-color 0.2s; }
+        .ttt-cell:hover { background-color: #4b5563; }
+    </style>
+</head>
+<body class="text-gray-200">
+
+    <div class="flex h-screen">
+        <!-- Sidebar -->
+        <aside id="sidebar" class="w-64 bg-gray-900/80 backdrop-blur-lg border-r border-gray-700/50 text-gray-300 flex-shrink-0 overflow-y-auto">
+            <div class="p-4 flex items-center border-b border-gray-700/50 sticky top-0 bg-gray-900/80 z-10">
+                <img src="https://i.ibb.co/xqYW77Dt/snaptik-7530677407800397061-4.jpg" alt="Web Apasaja Logo" class="h-10 w-10 rounded-full mr-3" onerror="this.onerror=null;this.src='https://placehold.co/40x40/1f2937/ffffff?text=WA';">
+                <h1 class="text-xl font-bold text-white">Web Apasaja</h1>
+            </div>
+            <nav id="sidebar-nav" class="p-2 space-y-1">
+                <!-- Categories populated by JS -->
+            </nav>
+        </aside>
+
+        <!-- Content Overlay for mobile -->
+        <div id="content-overlay" class="fixed inset-0 bg-black bg-opacity-60 z-50 hidden md:hidden"></div>
+
+        <!-- Main Content -->
+        <main id="main-content" class="flex-1 p-4 md:p-8 overflow-y-auto">
+            <div class="md-hidden flex justify-between items-center mb-4">
+                 <h1 class="text-xl font-bold text-white">Web apasaja v001</h1>
+                <button id="menu-toggle" class="p-2 rounded-md hover:bg-gray-700">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path></svg>
+                </button>
+            </div>
+            <div id="content-container">
+                <!-- Feature content will be injected here by JS -->
+            </div>
+        </main>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const sidebarNav = document.getElementById('sidebar-nav');
+        const contentContainer = document.getElementById('content-container');
+
+        const features = {
+            "Utama": {
+                "welcome": { name: "🏠 Beranda", content: welcomeContent() },
+            },
+            "Hiburan": {
+                "tic-tac-toe": { name: "⭕ Tic-Tac-Toe", content: ticTacToeContent(), onInit: initTicTacToe },
+                "typing-speed-test": { name: "⌨️ Tes Kecepatan Mengetik", content: typingSpeedTestContent(), onInit: initTypingSpeedTest },
+            },
+            "Keamanan": {
+                "encryption-breaker": { name: "🔓 Pemecah Enkripsi", content: encryptionBreakerContent(), onInit: initEncryptionBreaker },
+                "password-generator": { name: "🔑 Generator Password", content: passwordGeneratorContent(), onInit: initPasswordGenerator },
+                "password-strength": { name: "💪 Pemeriksa Kekuatan Password", content: passwordStrengthContent(), onInit: initPasswordStrength },
+            },
+            "Utilitas Web": {
+                "qr-code": { name: "📱 Kode QR", content: qrCodeContent(), onInit: initQrCode },
+                "json-formatter": { name: "{} JSON Formatter", content: jsonFormatterContent(), onInit: initJsonFormatter },
+                "base64-converter": { name: "🔀 Base64 Encoder/Decoder", content: base64ConverterContent(), onInit: initBase64Converter },
+            },
+            "Alat Teks": {
+                "word-counter": { name: "📊 Penghitung Kata", content: wordCounterContent(), onInit: initWordCounter },
+                "markdown-editor": { name: "✍️ Editor Markdown", content: markdownEditorContent(), onInit: initMarkdownEditor },
+            },
+            "Gambar & Warna": {
+                "color-picker": { name: "🎨 Pengambil Warna", content: colorPickerContent(), onInit: initColorPicker },
+                "gradient-generator": { name: "🌈 Generator Gradien CSS", content: gradientGeneratorContent(), onInit: initGradientGenerator },
+            },
+            "Kalkulator & Konverter": {
+                "calculator": { name: "🧮 Kalkulator Standar", content: calculatorContent(), onInit: initCalculator },
+                "unit-converter": { name: "📏 Konverter Satuan", content: unitConverterContent(), onInit: initUnitConverter },
+                "roman-numeral": { name: "🏛️ Konverter Angka Romawi", content: romanNumeralContent(), onInit: initRomanNumeral },
+            },
+        };
+
+        // --- APP INITIALIZATION ---
+        function initApp() {
+            for (const category in features) {
+                const categoryHeader = document.createElement('h2');
+                categoryHeader.className = 'px-2 pt-2 text-xs font-semibold text-gray-400 uppercase tracking-wider';
+                categoryHeader.textContent = category;
+                sidebarNav.appendChild(categoryHeader);
+
+                for (const id in features[category]) {
+                    const link = document.createElement('a');
+                    link.href = `#${id}`;
+                    link.className = 'sidebar-link flex items-center px-3 py-2 rounded-md hover:bg-gray-700/50 transition-colors duration-200';
+                    link.innerHTML = features[category][id].name;
+                    link.onclick = (e) => { e.preventDefault(); window.location.hash = id; };
+                    sidebarNav.appendChild(link);
+                }
+            }
+
+            window.addEventListener('hashchange', renderContent);
+            renderContent();
+            
+            const sidebar = document.getElementById('sidebar');
+            const menuToggle = document.getElementById('menu-toggle');
+            const contentOverlay = document.getElementById('content-overlay');
+            menuToggle.addEventListener('click', () => {
+                sidebar.classList.toggle('open');
+                contentOverlay.classList.toggle('hidden');
+            });
+            contentOverlay.addEventListener('click', () => {
+                sidebar.classList.remove('open');
+                contentOverlay.classList.add('hidden');
+            });
+        }
+
+        function renderContent() {
+            let id = window.location.hash.substring(1) || 'welcome';
+            let feature = Object.values(features).flatMap(cat => Object.entries(cat))
+                                .find(([key, val]) => key === id)?.[1];
+            
+            if (!feature) {
+                id = 'welcome';
+                feature = features["Utama"]["welcome"];
+            }
+            
+            document.querySelectorAll('.sidebar-link').forEach(link => {
+                link.classList.toggle('active', link.getAttribute('href') === `#${id}`);
+            });
+
+            contentContainer.innerHTML = feature.content;
+            if (feature.onInit) {
+                feature.onInit();
+            }
+            
+            if (window.innerWidth < 768) {
+                document.getElementById('sidebar').classList.remove('open');
+                document.getElementById('content-overlay').classList.add('hidden');
+            }
+        }
+
+        // --- HTML CONTENT TEMPLATES ---
+        function welcomeContent() { return `<div class="feature-card text-center">
+            <img src="https://i.ibb.co/xqYW77Dt/snaptik-7530677407800397061-4.jpg" alt="Web Apasaja Logo" class="w-24 h-24 mx-auto rounded-full mb-4 border-2 border-cyan-400" onerror="this.onerror=null;this.src='https://placehold.co/96x96/1f2937/ffffff?text=WA';">
+            <h2 class="text-4xl font-extrabold text-white mb-2">Web apasaja v001</h2>
+            <p class="text-lg text-gray-400 mb-6">Edisi Fokus & Keamanan.</p>
+            <p class="text-gray-500 mt-8">By Paong.</p>
+            </div>`; 
+        }
+        function ticTacToeContent() { return `<div class="feature-card max-w-sm mx-auto"><h3 class="text-2xl font-bold mb-4 text-center">⭕ Tic-Tac-Toe</h3><div id="ttt-board" class="grid grid-cols-3 gap-2"></div><div id="ttt-status" class="text-center text-xl font-bold mt-4 h-8"></div><button id="reset-ttt-btn" class="w-full mt-4 bg-red-600 p-2 rounded">Mulai Ulang</button></div>`; }
+        function typingSpeedTestContent() { return `<div class="feature-card"><h3 class="text-2xl font-bold mb-4">⌨️ Tes Kecepatan Mengetik</h3><div id="typing-text-display" class="bg-gray-800 p-4 rounded-lg text-2xl mb-4 font-mono select-none"></div><input type="text" id="typing-input" class="w-full bg-gray-800 p-2 text-2xl font-mono" disabled><div id="typing-results" class="mt-4 grid grid-cols-3 gap-4 text-center"><div><p>WPM</p><p id="wpm" class="text-3xl font-bold">0</p></div><div><p>Akurasi</p><p id="accuracy" class="text-3xl font-bold">0%</p></div><div><p>Waktu</p><p id="timer" class="text-3xl font-bold">60</p></div></div><button id="reset-typing-btn" class="w-full mt-4 bg-red-600 p-2 rounded">Mulai Ulang</button></div>`; }
+        function encryptionBreakerContent() { return `<div class="feature-card"><h3 class="text-2xl font-bold mb-4">🔓 Pemecah Enkripsi</h3><textarea id="eb-input" class="w-full h-40 bg-gray-800 p-2 rounded font-mono" placeholder="Masukkan teks terenkripsi..."></textarea><div class="flex gap-4 my-4"><select id="eb-cipher-type" class="w-full bg-gray-800 p-2 rounded"><option value="caesar">Caesar Cipher</option><option value="atbash">Atbash Cipher</option><option value="binary">Binary to Text</option><option value="hex">Hex to Text</option><option value="base64">Base64 Decode</option></select><button id="eb-solve-btn" class="bg-yellow-600 text-black font-bold p-2 rounded">Pecahkan!</button></div><div class="bg-gray-900/50 p-4 rounded"><h4 class="font-bold text-gray-400">Hasil:</h4><pre id="eb-output" class="w-full h-40 overflow-auto whitespace-pre-wrap"></pre></div></div>`; }
+        function passwordGeneratorContent() { return `<div class="feature-card"><h3 class="text-2xl font-bold mb-4">🔑 Generator Password</h3><div class="flex mb-4"><input id="password-output" readonly class="w-full bg-gray-800 p-2 rounded-l"><button id="copy-password-btn" class="bg-gray-600 p-2 rounded-r" title="Salin">Salin</button></div><div class="space-y-2"><label>Panjang: <span id="password-length-label">16</span></label><input id="password-length" type="range" min="8" max="32" value="16" class="w-full"><label><input type="checkbox" id="include-uppercase" checked> Huruf Besar</label><label><input type="checkbox" id="include-numbers" checked> Angka</label><label><input type="checkbox" id="include-symbols" checked> Simbol</label></div><button id="generate-password" class="w-full mt-4 bg-red-600 p-2 rounded">Buat</button></div>`; }
+        function passwordStrengthContent() { return `<div class="feature-card"><h3 class="text-2xl font-bold mb-4">💪 Pemeriksa Kekuatan Password</h3><input type="text" id="strength-input" class="w-full bg-gray-800 p-2 rounded"><div class="w-full bg-gray-700 rounded-full h-2.5 mt-4"><div id="strength-bar" class="h-2.5 rounded-full" style="width: 0%"></div></div><p id="strength-text" class="text-center mt-2 font-bold"></p></div>`; }
+        function qrCodeContent() { return `<div class="feature-card"><h3 class="text-2xl font-bold mb-4">📱 Kode QR</h3><div class="flex border-b border-gray-600 mb-4"><button class="tab-btn py-2 px-4 border-b-2 border-transparent active" data-tab="qr-generator">Buat</button><button class="tab-btn py-2 px-4 border-b-2 border-transparent" data-tab="qr-scanner">Pindai</button></div><div id="qr-generator" class="tab-content"><textarea id="qr-text" class="w-full h-24 bg-gray-800 p-2 rounded" placeholder="Masukkan teks atau URL..."></textarea><div class="flex justify-center mt-4"><div id="qrcode-output" class="p-4 bg-white rounded-lg"></div></div><button id="download-qr-btn" class="w-full mt-4 bg-cyan-600 p-2 rounded">Unduh QR Code</button></div><div id="qr-scanner" class="tab-content hidden"><input type="file" id="qr-file-input" accept="image/*" class="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-cyan-50 file:text-cyan-700"><canvas id="qr-canvas" class="hidden"></canvas><div id="qr-scan-result" class="mt-4 p-4 bg-gray-800 rounded text-center">Unggah gambar untuk memindai.</div></div></div>`; }
+        function jsonFormatterContent() { return `<div class="feature-card"><h3 class="text-2xl font-bold mb-4">{} JSON Formatter</h3><textarea id="json-input" placeholder='{"key": "value"}' class="w-full h-64 bg-gray-800 p-2 rounded font-mono"></textarea><button id="format-json-btn" class="w-full bg-cyan-600 p-2 rounded my-2">Format</button><pre id="json-output" class="w-full h-64 bg-gray-800 p-2 rounded overflow-auto"></pre></div>`; }
+        function base64ConverterContent() { return `<div class="feature-card"><h3 class="text-2xl font-bold mb-4">🔀 Base64 Encoder/Decoder</h3><textarea id="base64-input" class="w-full h-32 bg-gray-800 p-2 rounded"></textarea><div class="flex gap-2 my-2"><button id="base64-encode" class="w-full bg-cyan-600 p-2 rounded">Encode</button><button id="base64-decode" class="w-full bg-cyan-600 p-2 rounded">Decode</button></div><textarea id="base64-output" readonly class="w-full h-32 bg-gray-800 p-2 rounded"></textarea></div>`; }
+        function wordCounterContent() { return `<div class="feature-card"><h3 class="text-2xl font-bold mb-4">📊 Penghitung Kata</h3><textarea id="word-count-input" class="w-full h-48 bg-gray-800 p-2 rounded"></textarea><div class="mt-4 grid grid-cols-2 gap-4 text-lg"><p>Kata: <span id="word-count">0</span></p><p>Karakter: <span id="char-count">0</span></p></div></div>`; }
+        function markdownEditorContent() { return `<div class="feature-card"><h3 class="text-2xl font-bold mb-4">✍️ Editor Markdown</h3><div class="grid md:grid-cols-2 gap-4"><textarea id="markdown-input" class="w-full h-96 bg-gray-800 p-2 rounded font-mono"></textarea><div id="markdown-preview" class="prose prose-invert bg-gray-900/50 p-4 rounded h-96 overflow-y-auto"></div></div></div>`; }
+        function colorPickerContent() { return `<div class="feature-card"><h3 class="text-2xl font-bold mb-4">🎨 Pengambil Warna</h3><input type="file" id="cp-input" accept="image/*" class="block w-full mb-4 text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-cyan-50 file:text-cyan-700"><div class="flex flex-col md:flex-row gap-4 items-start"><canvas id="cp-canvas" class="border-2 border-gray-600 max-w-full cursor-crosshair"></canvas><div id="cp-info" class="p-4 bg-gray-800 rounded-lg"><div id="cp-preview" class="w-20 h-20 rounded-full mb-2 border-4 border-gray-600"></div><div id="cp-values">Arahkan kursor ke gambar</div></div></div></div>`; }
+        function gradientGeneratorContent() { return `<div class="feature-card"><h3 class="text-2xl font-bold mb-4">🌈 Generator Gradien CSS</h3><div class="flex gap-4 mb-4"><input type="color" id="grad-color1" value="#8BC6EC"><input type="color" id="grad-color2" value="#9599E2"></div><div id="grad-preview" class="w-full h-40 rounded-lg mb-4"></div><textarea id="grad-css" readonly class="w-full h-20 bg-gray-800 font-mono text-sm p-2 rounded"></textarea></div>`; }
+        function calculatorContent() { return `<div class="feature-card"><h3 class="text-2xl font-bold mb-4">🧮 Kalkulator Standar</h3><div class="max-w-xs mx-auto bg-gray-900/50 p-4 rounded-lg"><input type="text" id="calc-display" class="w-full bg-gray-800 text-right text-3xl font-mono p-4 mb-4 rounded" readonly><div id="calc-buttons" class="grid grid-cols-4 gap-2"></div></div></div>`; }
+        function unitConverterContent() { return `<div class="feature-card"><h3 class="text-2xl font-bold mb-4">📏 Konverter Satuan</h3><div class="grid md:grid-cols-3 gap-6"><div class="space-y-2"><label>Kilometer</label><input type="number" id="km-input" class="w-full bg-gray-800 p-2 rounded"><label>Mil</label><input id="miles-output" readonly class="w-full bg-gray-700 p-2 rounded"></div><div class="space-y-2"><label>Celsius</label><input type="number" id="celsius-input" class="w-full bg-gray-800 p-2 rounded"><label>Fahrenheit</label><input id="fahrenheit-output" readonly class="w-full bg-gray-700 p-2 rounded"></div><div class="space-y-2"><label>Kilogram</label><input type="number" id="kg-input" class="w-full bg-gray-800 p-2 rounded"><label>Pound</label><input id="lbs-output" readonly class="w-full bg-gray-700 p-2 rounded"></div></div></div>`; }
+        function romanNumeralContent() { return `<div class="feature-card"><h3 class="text-2xl font-bold mb-4">🏛️ Konverter Angka Romawi</h3><div class="grid md:grid-cols-2 gap-4"><input type="number" id="roman-num-input" placeholder="Angka (e.g., 1994)" class="bg-gray-800 p-2 rounded"><input id="roman-str-output" readonly placeholder="Hasil Romawi" class="bg-gray-700 p-2 rounded"></div></div>`; }
+
+        // --- ALL FEATURE INIT FUNCTIONS ---
+        
+        function initTicTacToe() {
+            const boardElement = document.getElementById('ttt-board');
+            const statusElement = document.getElementById('ttt-status');
+            const resetButton = document.getElementById('reset-ttt-btn');
+            let board, currentPlayer, gameOver;
+            function startGame() { board = Array(9).fill(null); currentPlayer = 'X'; gameOver = false; statusElement.textContent = `Giliran: ${currentPlayer}`; renderBoard(); }
+            function renderBoard() {
+                boardElement.innerHTML = '';
+                board.forEach((value, index) => {
+                    const cell = document.createElement('div');
+                    cell.className = 'ttt-cell'; 
+                    cell.dataset.index = index; cell.textContent = value || '';
+                    if (value === 'X') cell.style.color = '#60a5fa'; if (value === 'O') cell.style.color = '#f87171';
+                    cell.addEventListener('click', handleCellClick); boardElement.appendChild(cell);
+                });
+            }
+            function handleCellClick(e) {
+                const index = e.target.dataset.index; if (gameOver || board[index]) return;
+                board[index] = currentPlayer; renderBoard();
+                if (checkWinner()) { statusElement.textContent = `Pemenang: ${currentPlayer}!`; gameOver = true; }
+                else if (board.every(cell => cell)) { statusElement.textContent = 'Seri!'; gameOver = true; }
+                else { currentPlayer = currentPlayer === 'X' ? 'O' : 'X'; statusElement.textContent = `Giliran: ${currentPlayer}`; }
+            }
+            function checkWinner() { const lines = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]]; return lines.some(line => { const [a,b,c] = line; return board[a] && board[a] === board[b] && board[a] === board[c]; }); }
+            resetButton.addEventListener('click', startGame); startGame();
+        }
+
+        function initTypingSpeedTest() {
+            const textDisplay = document.getElementById('typing-text-display');
+            const input = document.getElementById('typing-input');
+            const wpmEl = document.getElementById('wpm');
+            const accuracyEl = document.getElementById('accuracy');
+            const timerEl = document.getElementById('timer');
+            const resetBtn = document.getElementById('reset-typing-btn');
+
+            const textSamples = ["Kucing itu melompat melewati pagar coklat dengan sangat cepat dan anggun sekali.", "Teknologi berkembang pesat mengubah cara kita hidup bekerja dan berkomunikasi."];
+            let timer, timeLeft = 60, typedChars = 0, isTyping = false;
+
+            function startGame() {
+                isTyping = false; clearInterval(timer); timeLeft = 60; typedChars = 0;
+                const sample = textSamples[Math.floor(Math.random() * textSamples.length)];
+                textDisplay.innerHTML = sample.split('').map(char => `<span>${char}</span>`).join('');
+                input.value = ''; input.disabled = false; input.focus();
+                timerEl.textContent = timeLeft; wpmEl.textContent = 0; accuracyEl.textContent = '100%';
+                if(textDisplay.childNodes.length > 0) textDisplay.childNodes[0].classList.add('current');
+            }
+
+            input.addEventListener('input', () => {
+                if (!isTyping) {
+                    isTyping = true;
+                    timer = setInterval(() => {
+                        timeLeft--; timerEl.textContent = timeLeft;
+                        if (timeLeft === 0) endGame();
+                    }, 1000);
+                }
+
+                const textChars = textDisplay.querySelectorAll('span');
+                const inputChars = input.value.split('');
+                typedChars = inputChars.length;
+                let correct = true;
+
+                textChars.forEach((charSpan, index) => {
+                    const char = inputChars[index];
+                    charSpan.classList.remove('correct', 'incorrect', 'current');
+                    if (char == null) {
+                        if (index === typedChars) charSpan.classList.add('current');
+                        correct = false;
+                    } else if (char === charSpan.innerText) {
+                        charSpan.classList.add('correct');
+                    } else {
+                        charSpan.classList.add('incorrect');
+                        correct = false;
+                    }
+                });
+
+                if (correct && typedChars === textChars.length) endGame();
+
+                let correctChars = document.querySelectorAll('#typing-text-display .correct').length;
+                let accuracy = typedChars > 0 ? Math.round((correctChars / typedChars) * 100) : 100;
+                accuracyEl.textContent = `${accuracy}%`;
+                
+                let wpm = Math.round(((correctChars / 5) / (60 - timeLeft)) * 60) || 0;
+                wpmEl.textContent = wpm;
+            });
+
+            function endGame() { clearInterval(timer); input.disabled = true; isTyping = false; }
+            resetBtn.addEventListener('click', startGame); startGame();
+        }
+
+        function initEncryptionBreaker() {
+            const inputEl = document.getElementById('eb-input'), outputEl = document.getElementById('eb-output'), cipherTypeEl = document.getElementById('eb-cipher-type'), solveBtn = document.getElementById('eb-solve-btn');
+            const commonIndonesianWords = ['yang', 'dan', 'di', 'itu', 'ini', 'adalah', 'untuk', 'dengan', 'dari', 'tidak'];
+            function solveCaesar(text) {
+                let bestShift = 0; let maxScore = 0; let bestDecryption = 'Tidak ditemukan hasil yang terbaca.';
+                for (let shift = 0; shift < 26; shift++) {
+                    let decrypted = ''; let score = 0;
+                    for (let i = 0; i < text.length; i++) {
+                        let char = text[i];
+                        if (char.match(/[a-z]/)) { decrypted += String.fromCharCode(((char.charCodeAt(0) - 97 - shift + 26) % 26) + 97); }
+                        else if (char.match(/[A-Z]/)) { decrypted += String.fromCharCode(((char.charCodeAt(0) - 65 - shift + 26) % 26) + 65); }
+                        else { decrypted += char; }
+                    }
+                    commonIndonesianWords.forEach(word => { if (decrypted.toLowerCase().includes(` ${word} `)) score++; });
+                    if (score > maxScore) { maxScore = score; bestShift = shift; bestDecryption = decrypted; }
+                }
+                return `Kemungkinan Pergeseran: ${bestShift}\n\n${bestDecryption}`;
+            }
+            function solveAtbash(text) { let result = ''; for (let i = 0; i < text.length; i++) { let charCode = text.charCodeAt(i); if (charCode >= 65 && charCode <= 90) { result += String.fromCharCode(90 - (charCode - 65)); } else if (charCode >= 97 && charCode <= 122) { result += String.fromCharCode(122 - (charCode - 97)); } else { result += text[i]; } } return result; }
+            function solveBinary(text) { try { return text.split(' ').map(bin => String.fromCharCode(parseInt(bin, 2))).join(''); } catch (e) { return 'Input biner tidak valid.'; } }
+            function solveHex(text) { try { let result = ''; for (let i = 0; i < text.length; i += 2) { result += String.fromCharCode(parseInt(text.substr(i, 2), 16)); } return result; } catch (e) { return 'Input heksadesimal tidak valid.'; } }
+            solveBtn.addEventListener('click', () => {
+                const inputText = inputEl.value; const cipherType = cipherTypeEl.value; let result = '';
+                if (cipherType === 'caesar') result = solveCaesar(inputText);
+                else if (cipherType === 'atbash') result = solveAtbash(inputText);
+                else if (cipherType === 'binary') result = solveBinary(inputText.replace(/\s/g, ''));
+                else if (cipherType === 'hex') result = solveHex(inputText.replace(/\s/g, ''));
+                else if (cipherType === 'base64') { try { result = atob(inputText); } catch(e) { result = 'Input Base64 tidak valid.'; } }
+                outputEl.textContent = result;
+            });
+        }
+        
+        function initPasswordGenerator() {
+            const output = document.getElementById('password-output'), lengthSlider = document.getElementById('password-length'), lengthLabel = document.getElementById('password-length-label'), copyBtn = document.getElementById('copy-password-btn'), generateBtn = document.getElementById('generate-password');
+            const opts = { upper: document.getElementById('include-uppercase'), numbers: document.getElementById('include-numbers'), symbols: document.getElementById('include-symbols') };
+            const chars = { lower: 'abcdefghijklmnopqrstuvwxyz', upper: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', numbers: '0123456789', symbols: '!@#$%^&*()_+-=[]{}|;:,.<>?' };
+            function generate() { const length = lengthSlider.value; let charset = chars.lower; if (opts.upper.checked) charset += chars.upper; if (opts.numbers.checked) charset += chars.numbers; if (opts.symbols.checked) charset += chars.symbols; let password = ''; for (let i = 0; i < length; i++) password += charset.charAt(Math.floor(Math.random() * charset.length)); output.value = password; }
+            lengthSlider.addEventListener('input', (e) => { lengthLabel.textContent = e.target.value; generate(); });
+            generateBtn.addEventListener('click', generate); Object.values(opts).forEach(opt => opt.addEventListener('change', generate));
+            copyBtn.addEventListener('click', () => { output.select(); document.execCommand('copy'); const originalText = copyBtn.textContent; copyBtn.textContent = 'Tersalin!'; setTimeout(() => { copyBtn.textContent = originalText; }, 1500); });
+            generate();
+        }
+
+        function initPasswordStrength() {
+            const input = document.getElementById('strength-input'), bar = document.getElementById('strength-bar'), text = document.getElementById('strength-text');
+            input.addEventListener('input', () => {
+                const pass = input.value; let score = 0;
+                if (!pass) { score = -1; } else { if (pass.length > 8) score++; if (pass.length > 12) score++; if (/[A-Z]/.test(pass)) score++; if (/[0-9]/.test(pass)) score++; if (/[^A-Za-z0-9]/.test(pass)) score++; }
+                const width = score > 0 ? (score / 5) * 100 : 0; bar.style.width = `${width}%`;
+                if(score <= 2) { bar.className = 'h-2.5 rounded-full bg-red-500'; text.textContent = 'Sangat Lemah'; text.style.color = '#f87171'; }
+                else if (score === 3) { bar.className = 'h-2.5 rounded-full bg-yellow-500'; text.textContent = 'Sedang'; text.style.color = '#facc15'; }
+                else { bar.className = 'h-2.5 rounded-full bg-green-500'; text.textContent = 'Kuat'; text.style.color = '#4ade80'; }
+                if (score === -1) { bar.style.width = '0%'; text.textContent = ''; }
+            });
+        }
+        
+        function initQrCode() {
+            const qrText = document.getElementById('qr-text');
+            const qrOutput = document.getElementById('qrcode-output');
+            let qrcode = new QRCode(qrOutput, { width: 180, height: 180, colorDark: "#000000", colorLight: "#ffffff" });
+
+            function makeQrCode() {
+                if (qrText.value.trim()) {
+                    qrOutput.style.display = 'block';
+                    qrcode.makeCode(qrText.value);
+                } else {
+                    qrcode.clear();
+                    qrOutput.style.display = 'none';
+                }
+            }
+            qrText.addEventListener('input', makeQrCode);
+            makeQrCode();
+
+            document.getElementById('download-qr-btn').addEventListener('click', () => {
+                const canvas = qrOutput.querySelector('canvas');
+                if (canvas) {
+                    const link = document.createElement('a');
+                    link.download = 'qrcode.png';
+                    link.href = canvas.toDataURL('image/png');
+                    link.click();
+                }
+            });
+
+            const fileInput = document.getElementById('qr-file-input'), canvas = document.getElementById('qr-canvas'), ctx = canvas.getContext('2d'), resultDiv = document.getElementById('qr-scan-result');
+            fileInput.addEventListener('change', (e) => {
+                const file = e.target.files[0]; if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        canvas.width = img.width; canvas.height = img.height;
+                        ctx.drawImage(img, 0, 0, img.width, img.height);
+                        const imageData = ctx.getImageData(0, 0, img.width, img.height);
+                        const code = jsQR(imageData.data, imageData.width, imageData.height);
+                        if (code) { resultDiv.innerHTML = `<strong>Hasil:</strong> <a href="${code.data}" target="_blank" class="text-cyan-400 break-all">${code.data}</a>`; }
+                        else { resultDiv.textContent = 'Tidak ada Kode QR yang ditemukan.'; }
+                    };
+                    img.src = event.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                    e.currentTarget.classList.add('active');
+                    document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+                    document.getElementById(e.currentTarget.dataset.tab).classList.remove('hidden');
+                });
+            });
+        }
+        
+        function initJsonFormatter() { document.getElementById('format-json-btn').addEventListener('click', () => { const input = document.getElementById('json-input'), output = document.getElementById('json-output'); try { const parsed = JSON.parse(input.value); output.textContent = JSON.stringify(parsed, null, 2); output.style.color = '#e5e7eb'; } catch (e) { output.textContent = e.message; output.style.color = '#f87171'; } }); }
+        function initBase64Converter() { const input = document.getElementById('base64-input'), output = document.getElementById('base64-output'); document.getElementById('base64-encode').addEventListener('click', () => { output.value = btoa(input.value); }); document.getElementById('base64-decode').addEventListener('click', () => { try { output.value = atob(input.value); } catch(e) { output.value = 'Input tidak valid.'; } }); }
+        function initWordCounter() { document.getElementById('word-count-input').addEventListener('input', e => { const text = e.target.value; document.getElementById('char-count').textContent = text.length; document.getElementById('word-count').textContent = (text.trim().match(/\S+/g) || []).length; }); }
+        function initMarkdownEditor() { const input = document.getElementById('markdown-input'), preview = document.getElementById('markdown-preview'), converter = new showdown.Converter(); const update = () => preview.innerHTML = converter.makeHtml(input.value); input.addEventListener('input', update); input.value = '# Hello, Markdown!'; update(); }
+        function initColorPicker() { const input = document.getElementById('cp-input'), canvas = document.getElementById('cp-canvas'), preview = document.getElementById('cp-preview'), values = document.getElementById('cp-values'); const ctx = canvas.getContext('2d'); input.addEventListener('change', (e) => { const reader = new FileReader(); reader.onload = (event) => { const img = new Image(); img.onload = () => { const MAX_WIDTH = 400; const scaleRatio = MAX_WIDTH / img.width; canvas.width = MAX_WIDTH; canvas.height = img.height * scaleRatio; ctx.drawImage(img, 0, 0, canvas.width, canvas.height); }; img.src = event.target.result; }; reader.readAsDataURL(e.target.files[0]); }); canvas.addEventListener('mousemove', (e) => { const rect = canvas.getBoundingClientRect(); const x = e.clientX - rect.left; const y = e.clientY - rect.top; const pixel = ctx.getImageData(x, y, 1, 1).data; const hex = `#${((1 << 24) + (pixel[0] << 16) + (pixel[1] << 8) + pixel[2]).toString(16).slice(1).toUpperCase()}`; preview.style.backgroundColor = hex; values.innerHTML = `<strong>HEX:</strong> ${hex}<br><strong>RGB:</strong> rgb(${pixel[0]}, ${pixel[1]}, ${pixel[2]})`; }); }
+        function initGradientGenerator() { const c1 = document.getElementById('grad-color1'), c2 = document.getElementById('grad-color2'), preview = document.getElementById('grad-preview'), cssOut = document.getElementById('grad-css'); function update() { const css = `background: linear-gradient(to right, ${c1.value}, ${c2.value});`; preview.style.background = `linear-gradient(to right, ${c1.value}, ${c2.value})`; cssOut.value = css; } c1.addEventListener('input', update); c2.addEventListener('input', update); update(); }
+        function initCalculator() {
+            const display = document.getElementById('calc-display');
+            const buttonsContainer = document.getElementById('calc-buttons');
+            const buttons = ['C', 'CE', '%', '/', '7', '8', '9', '*', '4', '5', '6', '-', '1', '2', '3', '+', '0', '.', '='];
+            buttons.forEach(btnText => {
+                const button = document.createElement('button'); button.textContent = btnText; button.className = 'p-4 rounded-lg text-xl font-bold text-white transition';
+                if (['/', '*', '-', '+', '%'].includes(btnText)) button.classList.add('bg-gray-600', 'hover:bg-gray-700');
+                else if (btnText === 'C' || btnText === 'CE') button.classList.add('bg-red-500', 'hover:bg-red-600');
+                else if (btnText === '=') button.classList.add('bg-cyan-600', 'hover:bg-cyan-700', 'col-span-2');
+                else button.classList.add('bg-gray-700', 'hover:bg-gray-800');
+                if (btnText === '0') button.classList.add('col-span-2');
+                button.addEventListener('click', () => {
+                    if (btnText === '=') { try { display.value = new Function('return ' + display.value.replace('%', '/100'))(); } catch { display.value = 'Error'; } }
+                    else if (btnText === 'C') { display.value = ''; }
+                    else if (btnText === 'CE') { display.value = display.value.slice(0, -1); }
+                    else { display.value += btnText; }
+                });
+                buttonsContainer.appendChild(button);
+            });
+        }
+        function initUnitConverter() { document.getElementById('km-input').addEventListener('input', e => document.getElementById('miles-output').value = !isNaN(e.target.value) ? (parseFloat(e.target.value) * 0.621371).toFixed(2) : ''); document.getElementById('celsius-input').addEventListener('input', e => document.getElementById('fahrenheit-output').value = !isNaN(e.target.value) ? ((parseFloat(e.target.value) * 9/5) + 32).toFixed(2) : ''); document.getElementById('kg-input').addEventListener('input', e => document.getElementById('lbs-output').value = !isNaN(e.target.value) ? (parseFloat(e.target.value) * 2.20462).toFixed(2) : ''); }
+        function initRomanNumeral() { const input = document.getElementById('roman-num-input'), output = document.getElementById('roman-str-output'); const map = { M:1000, CM:900, D:500, CD:400, C:100, XC:90, L:50, XL:40, X:10, IX:9, V:5, IV:4, I:1 }; input.addEventListener('input', () => { let num = parseInt(input.value); let result = ''; if (num > 0 && num < 4000) { for (let key in map) { while (num >= map[key]) { result += key; num -= map[key]; } } } output.value = result; }); }
+
+        // --- START THE APP ---
+        initApp();
+    });
+    </script>
+</body>
+</html>
